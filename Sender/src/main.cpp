@@ -1,160 +1,157 @@
 //-- Libraries Included
 //--------------------------------------------------------------
 #include <Arduino.h>
-#include <WiFi.h>
+#include <WiFi.h> // The Basic Function Of The ESP NOD MCU
 
 //------------------------------------------------------------------------------------
 // Define I/O Pins
 #define LED0 2 // WIFI Module LED
 
-#define OUTPUT_12 12
-#define OUTPUT_13 13
-#define OUTPUT_14 14
-#define OUTPUT_15 15
-#define OUTPUT_16 16
+#define INPUT_12 12
+#define INPUT_13 13
+#define INPUT_14 14
+#define INPUT_15 15
+#define INPUT_16 16
 
 //------------------------------------------------------------------------------------
 // Authentication Variables
-char *ssid;     // SERVER WIFI NAME
-char *password; // SERVER PASSWORD
+char *ssid;     // Wifi Name
+char *password; // Wifi Password
+const String Devicename = "Device_1";
 
 //------------------------------------------------------------------------------------
-// WiFi settings
-#define MAXSC 6 // MAXIMUM NUMBER OF CLIENTS
-
-IPAddress APlocal_IP(192, 168, 4, 1);
-IPAddress APgateway(192, 168, 4, 1);
-IPAddress APsubnet(255, 255, 255, 0);
+// WIFI Module Role & Port
+IPAddress TCP_Server(192, 168, 4, 1);
+IPAddress TCP_Gateway(192, 168, 4, 1);
+IPAddress TCP_Subnet(255, 255, 255, 0);
 
 unsigned int TCPPort = 2390;
 
-WiFiServer TCP_SERVER(TCPPort); // THE SERVER AND THE PORT NUMBER
-WiFiClient TCP_Client[MAXSC];   // THE SERVER CLIENTS Maximum number
+WiFiClient TCP_Client;
+
 //------------------------------------------------------------------------------------
 // Some Variables
-char result[10];
+char buffer[80];
 
-void HandleClients();
-void SetWifi(char *Name, char *Password);
+//====================================================================================
+
+void Check_WiFi_and_Connect_or_Reconnect();
+void Tell_Server_we_are_there();
+void Send_Request_To_Server();
 
 void setup() {
+  // setting the serial port ----------------------------------------------
+  Serial.begin(115200);
 
-  // Setting the serial port
-  Serial.begin(115200); // Computer Communication
+  // setting the mode of pins ---------------------------------------------
+  pinMode(LED0, OUTPUT);    // WIFI OnBoard LED Light
+  digitalWrite(LED0, !LOW); // Turn WiFi LED Off
 
-  // Setting the mode of the pins
-  pinMode(LED0, OUTPUT); // WIFI OnBoard LED Light
+  pinMode(INPUT_12, INPUT_PULLUP);
+  pinMode(INPUT_13, INPUT_PULLUP);
+  pinMode(INPUT_14, INPUT_PULLUP);
+  pinMode(INPUT_15, INPUT_PULLUP);
+  pinMode(INPUT_16, INPUT_PULLUP);
 
-  pinMode(OUTPUT_12, OUTPUT);
-  pinMode(OUTPUT_13, OUTPUT);
-  pinMode(OUTPUT_14, OUTPUT);
-  pinMode(OUTPUT_15, OUTPUT);
-  pinMode(OUTPUT_16, OUTPUT);
-
-  // setting up a Wifi AccessPoint
-  SetWifi("DataTransfer", "");
+  // WiFi Connect ----------------------------------------------------
+  Check_WiFi_and_Connect_or_Reconnect(); // Checking For Connection
 }
 
 //====================================================================================
 
-void loop() { HandleClients(); }
+void loop() { Send_Request_To_Server(); }
 
 //====================================================================================
 
-void SetWifi(char *Name, char *Password) {
-  // Stop any previous WIFI
-  WiFi.disconnect();
-
-  // Setting The Wifi Mode
-  WiFi.mode(WIFI_AP_STA);
-  Serial.println("WIFI Mode : AccessPoint");
-
-  // Setting the AccessPoint name & password
-  ssid = Name;
-  password = Password;
-
-  // Starting the access point
-  WiFi.softAPConfig(APlocal_IP, APgateway,
-                    APsubnet); // softAPConfig (local_ip, gateway, subnet)
-  WiFi.softAP(
-      ssid, password, 1, 0,
-      MAXSC); // WiFi.softAP(ssid, password, channel, hidden, max_connection)
-  Serial.println("WIFI < " + String(ssid) + " > ... Started");
-
-  // wait a bit
-  delay(50);
-
-  // getting server IP
-  IPAddress IP = WiFi.softAPIP();
-
-  // printing the server IP address
-  Serial.print("AccessPoint IP : ");
-  Serial.println(IP);
-
-  // starting server
-  TCP_SERVER.begin(); // which means basically WiFiServer(TCPPort);
-
-  Serial.println("Server Started");
-}
-
-//====================================================================================
-
-void HandleClients() {
+void Send_Request_To_Server() {
   unsigned long tNow;
 
-  if (TCP_SERVER.hasClient()) {
-    WiFiClient TCP_Client = TCP_SERVER.available();
-    TCP_Client.setNoDelay(1); // enable fast communication
-    while (1) {
-      //---------------------------------------------------------------
-      // If clients are connected
-      //---------------------------------------------------------------
-      if (TCP_Client.available()) {
-        // read the message
-        String Message = TCP_Client.readStringUntil('\r');
-        char buffer[80];
-        Message.toCharArray(buffer, sizeof(buffer));
+  tNow = millis();
 
-        // content
-        Serial.print("Content: ");
-        Serial.println(Message);
+  uint32_t inputPinState =
+      digitalRead(INPUT_12) << 12 | digitalRead(INPUT_13) << 13 |
+      digitalRead(INPUT_14) << 14 | digitalRead(INPUT_15) << 15 |
+      digitalRead(INPUT_16) << 16;
+  char inputPinStateString[11];
+  sprintf(buffer, "0x%08x", inputPinState);
 
-        uint32_t pinState = 0;
-        pinState = strtoul(&buffer[3], 0, 16);
+  Serial.print("send: ");
+  Serial.println(buffer);
+  TCP_Client.println(buffer); // Send Data
 
-        for (size_t i = 12; i < 17; i++) {
-          if (pinState & (1 << i)) {
-            digitalWrite(i, LOW);
-          } else {
-            digitalWrite(i, HIGH);
-          }
-        }
-
-        // generate a response - current run-time -> to identify the speed of
-        // the response
-        tNow = millis();
-        dtostrf(tNow, 8, 0, result);
-
-        // reply to the client with a message
-        TCP_Client.println(
-            result); // important to use println instead of print, as we are
-                     // looking for a '\r' at the client
+  while (1) {
+    int len = TCP_Client.available(); // Check For Reply
+    if (len > 0) {
+      if (len > 80) {
+        len = 80;
       }
+      String line = TCP_Client.readStringUntil('\r'); // if '\r' is found
+      Serial.print("received: ");                     // print the content
+      Serial.println(line);
 
-      //---------------------------------------------------------------
-      // If clients are disconnected // does not realy work....
-      //---------------------------------------------------------------
-      if (!TCP_Client || !TCP_Client.connected()) {
-        // Here We Turn Off The LED To Indicated The Its Disconnectted
-        digitalWrite(LED0, LOW);
-        break;
-      }
+      break; // exit
     }
-  } else {
-    // the LED blinks if no clients are available
-    digitalWrite(LED0, HIGH);
-    delay(250);
-    digitalWrite(LED0, LOW);
-    delay(250);
+    if ((millis() - tNow) > 1000) { // if more then 1 Second No Reply -> exit
+      Serial.println("timeout");
+      break; // exit
+    }
+  }
+
+  Check_WiFi_and_Connect_or_Reconnect();
+}
+
+//====================================================================================
+
+void Check_WiFi_and_Connect_or_Reconnect() {
+  if (WiFi.status() != WL_CONNECTED) {
+
+    TCP_Client.stop(); // Make Sure Everything Is Reset
+    WiFi.disconnect();
+    Serial.println("Not Connected...trying to connect...");
+    delay(50);
+    WiFi.mode(
+        WIFI_STA); // station (Client) Only - to avoid broadcasting an SSID ??
+    WiFi.begin("DataTransfer"); // the SSID that we want to connect to
+
+    while (WiFi.status() != WL_CONNECTED) {
+      for (int i = 0; i < 10; i++) {
+        digitalWrite(LED0, !HIGH);
+        delay(250);
+        digitalWrite(LED0, !LOW);
+        delay(250);
+        Serial.print(".");
+      }
+      Serial.println("");
+    }
+    // stop blinking to indicate if connected -------------------------------
+    digitalWrite(LED0, !HIGH);
+    Serial.println("!-- Client Device Connected --!");
+
+    // Printing IP Address --------------------------------------------------
+    Serial.println("Connected To      : " + String(WiFi.SSID()));
+    Serial.println("Signal Strenght   : " + String(WiFi.RSSI()) + " dBm");
+    Serial.print("Server IP Address : ");
+    Serial.println(TCP_Server);
+    Serial.print("Device IP Address : ");
+    Serial.println(WiFi.localIP());
+
+    // conecting as a client -------------------------------------
+    Tell_Server_we_are_there();
   }
 }
+
+//====================================================================================
+
+void Tell_Server_we_are_there() {
+  // first make sure you got disconnected
+  TCP_Client.stop();
+
+  // if sucessfully connected send connection message
+  if (TCP_Client.connect(TCP_Server, TCPPort)) {
+    Serial.println("<" + Devicename + "-CONNECTED>");
+    TCP_Client.println("<" + Devicename + "-CONNECTED>");
+  }
+  TCP_Client.setNoDelay(1); // allow fast communication?
+}
+
+//====================================================================================
