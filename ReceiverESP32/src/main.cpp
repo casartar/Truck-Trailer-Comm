@@ -1,14 +1,17 @@
-#include <Arduino.h>
-
-#include <Arduino.h>
-
 //-- Libraries Included
 //--------------------------------------------------------------
+#include <Arduino.h>
 #include <WiFi.h> // The Basic Function Of The ESP NOD MCU
 
 //------------------------------------------------------------------------------------
 // Define I/O Pins
 #define LED0 2 // WIFI Module LED
+
+#define INPUT_12 12
+#define INPUT_13 13
+#define INPUT_14 14
+#define INPUT_15 15
+#define INPUT_16 16
 
 //------------------------------------------------------------------------------------
 // Authentication Variables
@@ -28,8 +31,7 @@ WiFiClient TCP_Client;
 
 //------------------------------------------------------------------------------------
 // Some Variables
-unsigned char buffer[80];
-char result[10];
+char buffer[80];
 
 //====================================================================================
 
@@ -45,6 +47,12 @@ void setup() {
   pinMode(LED0, OUTPUT);    // WIFI OnBoard LED Light
   digitalWrite(LED0, !LOW); // Turn WiFi LED Off
 
+  pinMode(INPUT_12, INPUT_PULLUP);
+  pinMode(INPUT_13, INPUT_PULLUP);
+  pinMode(INPUT_14, INPUT_PULLUP);
+  pinMode(INPUT_15, INPUT_PULLUP);
+  pinMode(INPUT_16, INPUT_PULLUP);
+
   // WiFi Connect ----------------------------------------------------
   Check_WiFi_and_Connect_or_Reconnect(); // Checking For Connection
 }
@@ -59,9 +67,17 @@ void Send_Request_To_Server() {
   unsigned long tNow;
 
   tNow = millis();
-  dtostrf(tNow, 8, 0, result); // create a char[] out of the tNow
 
-  TCP_Client.println(result); // Send Data
+  uint32_t inputPinState =
+      digitalRead(INPUT_12) << 12 | digitalRead(INPUT_13) << 13 |
+      digitalRead(INPUT_14) << 14 | digitalRead(INPUT_15) << 15 |
+      digitalRead(INPUT_16) << 16;
+  char inputPinStateString[11];
+  sprintf(buffer, "0x%08x", inputPinState);
+
+  Serial.print("send: ");
+  Serial.println(buffer);
+  TCP_Client.println(buffer); // Send Data
 
   while (1) {
     int len = TCP_Client.available(); // Check For Reply
@@ -81,7 +97,6 @@ void Send_Request_To_Server() {
     }
   }
 
-  //TCP_Client.flush(); // Empty Bufffer
   Check_WiFi_and_Connect_or_Reconnect();
 }
 

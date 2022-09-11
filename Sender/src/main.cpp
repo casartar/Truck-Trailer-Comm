@@ -1,12 +1,17 @@
-#include <Arduino.h>
-
 //-- Libraries Included
 //--------------------------------------------------------------
-#include <ESP8266WiFi.h>
+#include <Arduino.h>
+#include <WiFi.h>
 
 //------------------------------------------------------------------------------------
 // Define I/O Pins
 #define LED0 2 // WIFI Module LED
+
+#define OUTPUT_12 12
+#define OUTPUT_13 13
+#define OUTPUT_14 14
+#define OUTPUT_15 15
+#define OUTPUT_16 16
 
 //------------------------------------------------------------------------------------
 // Authentication Variables
@@ -39,6 +44,12 @@ void setup() {
 
   // Setting the mode of the pins
   pinMode(LED0, OUTPUT); // WIFI OnBoard LED Light
+
+  pinMode(OUTPUT_12, OUTPUT);
+  pinMode(OUTPUT_13, OUTPUT);
+  pinMode(OUTPUT_14, OUTPUT);
+  pinMode(OUTPUT_15, OUTPUT);
+  pinMode(OUTPUT_16, OUTPUT);
 
   // setting up a Wifi AccessPoint
   SetWifi("DataTransfer", "");
@@ -101,20 +112,23 @@ void HandleClients() {
       if (TCP_Client.available()) {
         // read the message
         String Message = TCP_Client.readStringUntil('\r');
-
-        // print the message on the screen
-        Serial.print("Received packet of size ");
-        Serial.println(sizeof(Message));
-
-        // print who sent it
-        Serial.print("From ");
-        Serial.print(TCP_Client.remoteIP());
-        Serial.print(", port ");
-        Serial.println(TCP_Client.remotePort());
+        char buffer[80];
+        Message.toCharArray(buffer, sizeof(buffer));
 
         // content
         Serial.print("Content: ");
         Serial.println(Message);
+
+        uint32_t pinState = 0;
+        pinState = strtoul(&buffer[3], 0, 16);
+
+        for (size_t i = 12; i < 17; i++) {
+          if (pinState & (1 << i)) {
+            digitalWrite(i, LOW);
+          } else {
+            digitalWrite(i, HIGH);
+          }
+        }
 
         // generate a response - current run-time -> to identify the speed of
         // the response
@@ -125,7 +139,6 @@ void HandleClients() {
         TCP_Client.println(
             result); // important to use println instead of print, as we are
                      // looking for a '\r' at the client
-        TCP_Client.flush();
       }
 
       //---------------------------------------------------------------
