@@ -12,6 +12,7 @@
 #define INPUT_14 14
 #define INPUT_15 15
 #define INPUT_16 16
+#define INPUT_4 4
 
 //------------------------------------------------------------------------------------
 // Authentication Variables
@@ -52,6 +53,7 @@ void setup() {
   pinMode(INPUT_14, INPUT_PULLUP);
   pinMode(INPUT_15, INPUT_PULLUP);
   pinMode(INPUT_16, INPUT_PULLUP);
+  pinMode(INPUT_4, INPUT_PULLUP);
 
   // WiFi Connect ----------------------------------------------------
   Check_WiFi_and_Connect_or_Reconnect(); // Checking For Connection
@@ -71,7 +73,7 @@ void Send_Request_To_Server() {
   uint32_t inputPinState =
       digitalRead(INPUT_12) << 12 | digitalRead(INPUT_13) << 13 |
       digitalRead(INPUT_14) << 14 | digitalRead(INPUT_15) << 15 |
-      digitalRead(INPUT_16) << 16;
+      digitalRead(INPUT_16) << 16 | digitalRead(INPUT_4) << 4;
   char inputPinStateString[11];
   sprintf(buffer, "0x%08x", inputPinState);
 

@@ -12,6 +12,7 @@
 #define OUTPUT_14 14
 #define OUTPUT_15 15
 #define OUTPUT_16 16
+#define OUTPUT_4 4
 
 //------------------------------------------------------------------------------------
 // Authentication Variables
@@ -50,6 +51,7 @@ void setup() {
   pinMode(OUTPUT_14, OUTPUT);
   pinMode(OUTPUT_15, OUTPUT);
   pinMode(OUTPUT_16, OUTPUT);
+  pinMode(OUTPUT_4, OUTPUT);
 
   // setting up a Wifi AccessPoint
   SetWifi("DataTransfer", "");
@@ -128,6 +130,12 @@ void HandleClients() {
           } else {
             digitalWrite(i, HIGH);
           }
+        }
+        
+        if (pinState & (1 << OUTPUT_4)) {
+          digitalWrite(OUTPUT_4, LOW);
+        } else {
+          digitalWrite(OUTPUT_4, HIGH);
         }
 
         // generate a response - current run-time -> to identify the speed of
