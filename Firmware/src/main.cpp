@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <TLC59116.h>
+#include "TLC59116.h"
 
 TLC59116 board1(0);
 
@@ -17,10 +17,10 @@ void setup() {
 
 
 void loop() {
-
+    board1.begin();
     for (uint8_t i = 0; i < 16; i++)
-    {
-        board1.analogWrite(i, digitalRead(pinArray[i]) ? 20 : 0);
+    {       
+        board1.analogWrite(i, digitalRead(pinArray[i]) ? 0 : 20);
     }
 	delay(10);
 }
